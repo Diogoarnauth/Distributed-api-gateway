@@ -1,0 +1,17 @@
+{
+  "routes": [
+    {
+      "path": "/api/orders",
+      "upstreams": [
+        "http://localhost:8081",
+        "http://localhost:8082"
+      ]
+    },
+    {
+      "path": "/api/users",
+      "upstreams": [
+        "http://localhost:8083"
+      ]
+    }
+  ]
+}

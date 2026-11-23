@@ -1,0 +1,16 @@
+# Binários
+*.exe
+*.out
+/bin/
+distributed-api-gateway
+
+
+.vscode/
+.idea/
+.DS_Store
+
+
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
