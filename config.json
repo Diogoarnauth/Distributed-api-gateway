@@ -2,6 +2,7 @@
   "routes": [
     {
       "path": "/api/orders",
+      "strip_prefix": "/api",
       "upstreams": [
         "http://localhost:8081",
         "http://localhost:8082"
@@ -9,6 +10,7 @@
     },
     {
       "path": "/api/users",
+      "strip_prefix": "/api",
       "upstreams": [
         "http://localhost:8083"
       ]

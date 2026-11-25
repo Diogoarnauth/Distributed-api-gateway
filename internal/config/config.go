@@ -1,3 +1,15 @@
+// Package config loads the gateway's routing configuration from config.json.
+//
+// config.json says where each request should go: every route has a path
+// prefix (e.g. "/api/orders") and a list of upstream servers that handle it.
+// To Go, that file is just text, so Load reads it and json.Unmarshal turns it
+// into Go values ([]Route) that the code can use. The struct tags
+// (`json:"path"`) tell Unmarshal which JSON key fills which field. Load runs
+// only once, at startup in main.go, before the server accepts any request:
+// main.go calls Load, then NewGateway uses the routes to build the resolver,
+// the balancers and the proxies. After that the file is never read again.
+// Validate rejects a bad config at startup (fail fast), so the gateway never
+// runs with broken routes.
 package config
 
 import (
@@ -13,8 +25,12 @@ type Config struct {
 }
 
 type Route struct {
-	Path      string   `json:"path"`
-	Upstreams []string `json:"upstreams"`
+	Path string `json:"path"`
+	// StripPrefix is removed from the request path before it is sent to the
+	// upstream, e.g. "/api" turns "/api/orders/1" into "/orders/1".
+	// Empty means the path is forwarded unchanged.
+	StripPrefix string   `json:"strip_prefix,omitempty"`
+	Upstreams   []string `json:"upstreams"`
 }
 
 func Load(path string) (*Config, error) {
@@ -53,6 +69,10 @@ func (c *Config) Validate() error {
 		}
 
 		seen[route.Path] = true
+
+		if err := validateStripPrefix(route); err != nil {
+			return err
+		}
 
 		if len(route.Upstreams) == 0 {
 			return fmt.Errorf("route %q has no upstreams", route.Path)
@@ -93,6 +113,35 @@ func (c *Config) Validate() error {
 				)
 			}
 		}
+	}
+
+	return nil
+}
+
+// validateStripPrefix checks that strip_prefix, when set, is a whole-segment
+// prefix of the route path ("/api" fits "/api/orders", "/ap" does not), so
+// stripping it always leaves a path that starts with "/".
+func validateStripPrefix(route Route) error {
+	prefix := route.StripPrefix
+
+	if prefix == "" {
+		return nil
+	}
+
+	if !strings.HasPrefix(prefix, "/") || strings.HasSuffix(prefix, "/") {
+		return fmt.Errorf(
+			"route %q: strip_prefix must start with / and not end with /: %q",
+			route.Path,
+			prefix,
+		)
+	}
+
+	if route.Path != prefix && !strings.HasPrefix(route.Path, prefix+"/") {
+		return fmt.Errorf(
+			"route %q: strip_prefix %q is not a prefix of the route path",
+			route.Path,
+			prefix,
+		)
 	}
 
 	return nil
